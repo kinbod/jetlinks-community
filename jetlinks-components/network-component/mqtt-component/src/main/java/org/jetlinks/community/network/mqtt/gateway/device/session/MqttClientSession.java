@@ -133,8 +133,7 @@ public class MqttClientSession implements PersistentSession {
 
     @Override
     public boolean isAlive() {
-        return (clientTemp == null || clientTemp.isAlive()) &&
-            (keepAliveTimeout <= 0 || System.currentTimeMillis() - lastPingTime < keepAliveTimeout);
+        return keepAliveTimeout <= 0 || System.currentTimeMillis() - lastPingTime < keepAliveTimeout;
     }
 
     @Override
