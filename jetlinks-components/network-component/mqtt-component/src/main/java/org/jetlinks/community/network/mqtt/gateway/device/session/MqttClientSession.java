@@ -28,6 +28,7 @@ import org.jetlinks.core.message.codec.Transport;
 import org.jetlinks.core.server.session.PersistentSession;
 import org.jetlinks.community.gateway.monitor.DeviceGatewayMonitor;
 import org.jetlinks.community.network.mqtt.client.MqttClient;
+import org.jetlinks.core.utils.Reactors;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
@@ -138,11 +139,7 @@ public class MqttClientSession implements PersistentSession {
 
     @Override
     public Mono<Boolean> isAliveAsync() {
-        return client
-            .map(client -> {
-                this.clientTemp = client;
-                return isAlive();
-            });
+        return isAlive() ? Reactors.ALWAYS_TRUE : Reactors.ALWAYS_FALSE;
     }
 
     @Override
