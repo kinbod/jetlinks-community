@@ -80,7 +80,7 @@ public class UserAuthenticationEventPublisher {
     private Mono<Void> publish0(Collection<String> userIdList) {
         return Flux
             .fromIterable(userIdList)
-            .flatMapDelayError(
+            .flatMap(
                 userId -> eventBus
                     .publish(Topics.Authentications.userAuthenticationChanged(userId),
                              ReactiveAuthenticationHolder

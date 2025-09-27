@@ -17,6 +17,7 @@ package org.jetlinks.community.notify.manager.service;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.hswebframework.ezorm.rdb.mapping.ReactiveRepository;
 import org.hswebframework.web.authorization.Authentication;
@@ -26,6 +27,8 @@ import org.hswebframework.web.crud.service.GenericReactiveCrudService;
 import org.hswebframework.web.exception.BusinessException;
 import org.hswebframework.web.i18n.LocaleUtils;
 import org.jetlinks.community.gateway.annotation.Subscribe;
+import org.jetlinks.community.lock.ReactiveLock;
+import org.jetlinks.community.lock.ReactiveLockHolder;
 import org.jetlinks.community.notify.manager.configuration.NotifySubscriberProperties;
 import org.jetlinks.community.notify.manager.entity.Notification;
 import org.jetlinks.community.notify.manager.entity.NotifySubscriberChannelEntity;
@@ -56,6 +59,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 @Service
@@ -463,13 +467,9 @@ public class NotifySubscriberService extends GenericReactiveCrudService<NotifySu
         }
 
         public void handleSubscriberEntity(NotifySubscriberEntity entity) {
-            NotifySubscriberProviderCache cache = providerChannels.get(entity.getProviderId());
-            NotifySubscriberProviderEntity provider = null;
-            if (cache != null) {
-                provider = cache.getProvider();
-            }
-            //取消订阅
-            if ((provider != null && provider.getState() == NotifyChannelState.disabled) || entity.getState() == SubscribeState.disabled) {
+            // 取消订阅，没有订阅通道也取消，减少内存占用。
+            if (entity.getState() == SubscribeState.disabled
+                || CollectionUtils.isEmpty(entity.getNotifyChannels())) {
                 Disposable disp = subs.remove(entity.getId());
                 if (disp != null) {
                     log.debug("unsubscribe:{}({}),{},subscriber:{}",
@@ -483,8 +483,7 @@ public class NotifySubscriberService extends GenericReactiveCrudService<NotifySu
                 return;
             }
 
-            subs.computeIfAbsent(entity.getId(), ignore -> new Node())
-                .init(entity);
+            subs.computeIfAbsent(entity.getId(), ignore -> new Node()).init(entity);
         }
 
         @Override
@@ -521,8 +520,15 @@ public class NotifySubscriberService extends GenericReactiveCrudService<NotifySu
                     disposable.dispose();
                 }
 
+                // fixme 使用锁来限制并发
+                ReactiveLock lock = ReactiveLockHolder
+                    .getLock("subscriber_loader:" +
+                                 ThreadLocalRandom.current().nextInt(
+                                     0,
+                                     Runtime.getRuntime().availableProcessors()));
                 disposable = Mono
-                    .zip(ReactiveAuthenticationHolder.get(entity.getSubscriber()), getProvider(entity))
+                    .zip(ReactiveAuthenticationHolder.get(entity.getSubscriber()).as(lock::lock),
+                         getProvider(entity))
                     .flatMap(tp2 -> {
                         initNotifyChannels(tp2.getT1());
                         return tp2.getT2().createSubscriber(entity.getId(), tp2.getT1(), entity.getTopicConfig());
