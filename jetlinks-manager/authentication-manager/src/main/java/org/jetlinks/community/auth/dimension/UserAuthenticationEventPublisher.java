@@ -81,16 +81,12 @@ public class UserAuthenticationEventPublisher {
         return Flux
             .fromIterable(userIdList)
             .flatMapDelayError(
-                userId -> ReactiveAuthenticationHolder
-                    .get(userId)
-                    .flatMap(auth -> eventBus
-                        .publish(Topics
-                                     .Authentications
-                                     .userAuthenticationChanged(auth.getUser().getId()),
-                                 FastSerializableAuthentication.of(auth, true)
-                        ))
-                    .as(MonoTracer.create("/user/" + userId + "/authentication/changed")),
-                4, 4)
+                userId -> eventBus
+                    .publish(Topics.Authentications.userAuthenticationChanged(userId),
+                             ReactiveAuthenticationHolder
+                                 .get(userId)
+                                 .map(auth -> FastSerializableAuthentication.of(auth, true)))
+                    .as(MonoTracer.create("/user/" + userId + "/authentication/changed")), 4, 4)
             .then();
     }
 

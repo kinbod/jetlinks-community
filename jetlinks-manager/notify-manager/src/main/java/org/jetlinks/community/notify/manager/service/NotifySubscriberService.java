@@ -359,15 +359,15 @@ public class NotifySubscriberService extends GenericReactiveCrudService<NotifySu
 
     }
 
-    //用户权限变更时重新订阅
-    @Subscribe(value = Topics.Authentications.allUserAuthenticationChanged, features = Subscription.Feature.local)
-    public void handleAuthenticationChanged(Authentication auth) {
-
-        SubTable table = subscribers.get(auth.getUser().getId());
-        if (table != null) {
-            table.resubscribe(auth);
-        }
-    }
+//    //用户权限变更时重新订阅
+//    @Subscribe(value = Topics.Authentications.allUserAuthenticationChanged, features = Subscription.Feature.local)
+//    public void handleAuthenticationChanged(Authentication auth) {
+//
+//        SubTable table = subscribers.get(auth.getUser().getId());
+//        if (table != null) {
+//            table.resubscribe(auth);
+//        }
+//    }
 
     //用户订阅表
     private class SubTable implements Disposable {
@@ -380,6 +380,20 @@ public class NotifySubscriberService extends GenericReactiveCrudService<NotifySu
 
         public SubTable(String subscriber) {
             this.subscriber = subscriber;
+            disposable.add(
+                eventBus.subscribe(
+                    Subscription
+                        .builder()
+                        .features(Subscription.Feature.local)
+                        .topics(Topics.Authentications.userAuthenticationChanged(subscriber))
+                        .subscriberId("notify_subscriber")
+                        .build(),
+                    p -> {
+                        resubscribe(p.decode(Authentication.class));
+                        return Mono.empty();
+                    }
+                )
+            );
         }
 
         void resubscribe(Authentication authentication) {
@@ -629,7 +643,7 @@ public class NotifySubscriberService extends GenericReactiveCrudService<NotifySu
 
         private final Map<String, NotifySubscriberChannelEntity> channels = new ConcurrentHashMap<>();
 
-        public NotifySubscriberProviderEntity getProvider(){
+        public NotifySubscriberProviderEntity getProvider() {
             return provider;
         }
 
