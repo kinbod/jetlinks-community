@@ -161,6 +161,32 @@ public class DefaultMenuService
             .as(this::convertToView);
     }
 
+    public Flux<MenuView> getGrantedMenus(List<Dimension> dimensions,
+                                          Mono<Map<String, MenuEntity>> menuEntityMap) {
+        if (CollectionUtils.isEmpty(dimensions)) {
+            return Flux.empty();
+        }
+        List<String> keyList = dimensions
+            .stream()
+            .filter(this::isMenuDimension)
+            .map(dimension -> MenuBindEntity.generateTargetKey(dimension.getType().getId(), dimension.getId()))
+            .collect(Collectors.toList());
+
+        return convertToView(CollectionUtils.isEmpty(keyList)
+                                 ? Flux.empty()
+                                 : bindRepository
+                                 .createQuery()
+                                 .where()
+                                 .in(MenuBindEntity::getTargetKey, keyList)
+                                 .fetch(),
+                             menuEntityMap);
+    }
+
+    private boolean isMenuDimension(Dimension dimension) {
+        //是配置中的维度并且没有忽略
+        return properties.getDimensions().contains(dimension.getType().getId());
+    }
+
     public Flux<MenuView> getGrantedMenus(String dimensionType, String dimensionId) {
         return getGrantedMenus(dimensionType, Collections.singleton(dimensionId));
     }
