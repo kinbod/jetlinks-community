@@ -35,9 +35,9 @@
         <!-- https://github.com/jetlinks/reactor-ql -->
         <reactor.ql.version>1.0.19</reactor.ql.version>
         <!-- https://github.com/jetlinks/jetlinks-plugin -->
-        <jetlinks.plugin.version>1.0.3</jetlinks.plugin.version>
+        <jetlinks.plugin.version>1.0.5-SNAPSHOT</jetlinks.plugin.version>
         <!-- https://github.com/jetlinks/jetlinks-sdk -->
-        <jetlinks.sdk.version>1.0.2</jetlinks.sdk.version>
+        <jetlinks.sdk.version>1.1.0-SNAPSHOT</jetlinks.sdk.version>
         <!-- https://github.com/hsweb/hsweb-utils -->
         <hsweb.utils.version>3.0.5</hsweb.utils.version>
 
@@ -721,6 +721,12 @@
                 <groupId>org.hswebframework.web</groupId>
                 <artifactId>hsweb-core</artifactId>
                 <version>${hsweb.framework.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.jetlinks</groupId>
+                <artifactId>rule-engine-api</artifactId>
+                <version>${jetlinks.version}</version>
             </dependency>
 
             <dependency>
