@@ -174,7 +174,7 @@ public class DefaultAlarmHandler implements AlarmHandler {
         ReactiveLock lock = ReactiveLockHolder
             .getLock("triggerAlarm:" + recordId);
         return this
-            .getRecordCache(createRecordId(relieveInfo))
+            .getRecordCache(recordId)
             .flatMap(cache -> {
                 if (relieveInfo.getRelieveTime() == null) {
                     relieveInfo.setRelieveTime(System.currentTimeMillis());
