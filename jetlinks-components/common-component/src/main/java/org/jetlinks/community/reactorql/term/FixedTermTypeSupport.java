@@ -22,13 +22,14 @@ import org.hswebframework.ezorm.rdb.operator.builder.fragments.NativeSql;
 import org.hswebframework.ezorm.rdb.operator.builder.fragments.PrepareSqlFragments;
 import org.hswebframework.ezorm.rdb.operator.builder.fragments.SqlFragments;
 import org.hswebframework.web.i18n.LocaleUtils;
+import org.jetlinks.community.utils.ConverterUtils;
+import org.jetlinks.community.utils.ReactorUtils;
 import org.jetlinks.core.metadata.DataType;
 import org.jetlinks.core.metadata.types.*;
-import org.jetlinks.community.utils.ConverterUtils;
+import reactor.core.publisher.Mono;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -53,11 +54,19 @@ public enum FixedTermTypeSupport implements TermTypeSupport {
         protected String createDefaultDesc(String property, Object expect, Object actual) {
             return String.format("%s%s", property, getName());
         }
+        @Override
+        protected Object getExpectRef(String col) {
+            return 1;
+        }
     },
     isnull("为空", "isnull", false) {
         @Override
         public String createDefaultDesc(String property, Object expect, Object actual) {
             return String.format("%s%s", property, getName());
+        }
+        @Override
+        protected Object getExpectRef(String col) {
+            return 1;
         }
     },
 
@@ -342,5 +351,33 @@ public enum FixedTermTypeSupport implements TermTypeSupport {
             createValueDesc(expect),
             actual
         );
+    }
+
+    protected Object getExpectRef(String col){
+        return NativeSql.of(col);
+    }
+    private Function<Object, Mono<Boolean>> createFilter() {
+        Term term = new Term();
+        term.setTermType(getType());
+        term.setColumn("_actual");
+        term.setValue(getExpectRef("_expect"));
+        return ReactorUtils.createFilter(Collections.singletonList(term));
+    }
+
+    private volatile Function<Object, Mono<Boolean>> filter;
+
+    @Override
+    public Mono<Boolean> match(Object expect, Object actual) {
+        if (filter == null) {
+            synchronized (this) {
+                if (filter == null) {
+                    filter = createFilter();
+                }
+            }
+        }
+        Map<String, Object> val = new HashMap<>();
+        val.put("_actual", actual);
+        val.put("_expect", expect);
+        return filter.apply(val);
     }
 }
