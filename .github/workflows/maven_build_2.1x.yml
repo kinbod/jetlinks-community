@@ -2,7 +2,7 @@ name: Auto Deploy Docker
 
 on:
   push:
-    branches: [ "2.10" ]
+    branches: [ "2.10","2.11" ]
 jobs:
   build:
 
