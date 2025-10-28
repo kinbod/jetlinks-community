@@ -33,7 +33,7 @@ services:
             timeout: 5s
             retries: 5
     jetlinks:
-        image: registry.cn-shenzhen.aliyuncs.com/jetlinks/jetlinks-community:2.10.0-SNAPSHOT
+        image: registry.cn-shenzhen.aliyuncs.com/jetlinks/jetlinks-community:2.11.0-SNAPSHOT
         container_name: jetlinks-ce
         ports:
             - "8848:8848" # 平台访问端口
