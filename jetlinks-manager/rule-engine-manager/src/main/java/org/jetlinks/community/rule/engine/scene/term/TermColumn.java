@@ -189,6 +189,8 @@ public class TermColumn {
             setFullNameCode(I18nSpec.of(null, localeName));
             setFullName(fullNameCode.resolveI18nMessage());
         }
+        others.put(PropertyMetadataConstants.Group.id.getKey(), PropertyMetadataConstants.Group.getId(metadata));
+        others.put(PropertyMetadataConstants.Group.name.getKey(), PropertyMetadataConstants.Group.getName(metadata));
         return this;
     }
 

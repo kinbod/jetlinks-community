@@ -16,6 +16,7 @@
 package org.jetlinks.community;
 
 import org.jetlinks.community.utils.ConverterUtils;
+import org.jetlinks.core.config.ConfigKey;
 import org.jetlinks.core.message.DeviceMessage;
 import org.jetlinks.core.message.HeaderKey;
 import org.jetlinks.core.metadata.PropertyMetadata;
@@ -110,7 +111,7 @@ public interface PropertyMetadataConstants {
         String id = "metrics";
 
 
-        static Map<String,Object> metricsToExpands(List<PropertyMetric> metrics) {
+        static Map<String, Object> metricsToExpands(List<PropertyMetric> metrics) {
             return Collections.singletonMap(id, metrics);
         }
 
@@ -126,7 +127,7 @@ public interface PropertyMetadataConstants {
                 .getExpand(id)
                 .map(obj -> {
                     for (PropertyMetric propertyMetric : ConverterUtils.convertToList(obj, PropertyMetric::of)) {
-                        if(Objects.equals(metric, propertyMetric.getId())){
+                        if (Objects.equals(metric, propertyMetric.getId())) {
                             return propertyMetric;
                         }
                     }
@@ -134,5 +135,23 @@ public interface PropertyMetadataConstants {
                 });
         }
 
+    }
+
+    interface Group {
+        ConfigKey<String> id = ConfigKey.of("groupId", "分组ID", String.class);
+        ConfigKey<String> name = ConfigKey.of("groupName", "分组名称", String.class);
+
+
+        static String getId(PropertyMetadata metadata) {
+            return metadata
+                .getExpand(id)
+                .orElse("");
+        }
+
+        static String getName(PropertyMetadata metadata) {
+            return metadata
+                .getExpand(name)
+                .orElse("");
+        }
     }
 }
