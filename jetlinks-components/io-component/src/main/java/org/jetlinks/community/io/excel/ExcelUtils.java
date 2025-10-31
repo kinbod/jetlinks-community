@@ -29,6 +29,7 @@ import org.hswebframework.reactor.excel.*;
 import org.hswebframework.reactor.excel.poi.options.CellOption;
 import org.hswebframework.web.bean.FastBeanCopier;
 import org.hswebframework.web.i18n.LocaleUtils;
+import org.jetlinks.community.io.excel.annotation.ExcelBooleanMapping;
 import org.jetlinks.community.io.excel.converter.*;
 import org.jetlinks.community.utils.ObjectMappers;
 import org.jetlinks.core.metadata.Jsonable;
@@ -298,11 +299,20 @@ public class ExcelUtils {
             return new DateConverter(format, type);
         }
 
+        if (type == Boolean.class || type == boolean.class) {
+            ExcelBooleanMapping mapping = field.getAnnotation(ExcelBooleanMapping.class);
+            if (mapping == null) {
+                return BooleanConverter.INSTANCE;
+            } else {
+                return new BooleanConverter(mapping);
+            }
+        }
+
         if (type == String.class) {
             return StringConverter.INSTANCE;
         }
 
-        org.jetlinks.community.dictionary.Dictionary dictionary = field.getAnnotation( org.jetlinks.community.dictionary.Dictionary.class);
+        org.jetlinks.community.dictionary.Dictionary dictionary = field.getAnnotation(org.jetlinks.community.dictionary.Dictionary.class);
         if (dictionary != null) {
             return new DictionaryConverter(dictionary.value(), type);
         }
