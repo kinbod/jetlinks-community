@@ -55,7 +55,7 @@ import java.util.stream.Collectors;
  */
 @RestController
 @RequestMapping("/device/gateway")
-@Resource(id = "device-gateway-manager", name = "网关设备管理")
+@Resource(id = "device-instance", name = "设备实例")
 @Authorize
 @Tag(name = "网关设备管理")
 public class GatewayDeviceController {
