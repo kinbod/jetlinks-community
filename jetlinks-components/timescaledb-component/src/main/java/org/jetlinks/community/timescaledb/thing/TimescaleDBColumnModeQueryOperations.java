@@ -28,7 +28,7 @@ import org.hswebframework.ezorm.rdb.operator.dml.query.SelectColumn;
 import org.hswebframework.web.api.crud.entity.PagerResult;
 import org.hswebframework.web.api.crud.entity.QueryParamEntity;
 import org.hswebframework.web.crud.query.QueryHelper;
-import org.jetlinks.core.metadata.EventMetadata;
+import org.jetlinks.community.timescaledb.metadata.TimescaleDBPropertiesFeature;
 import org.jetlinks.core.things.ThingsRegistry;
 import org.jetlinks.community.things.data.AggregationRequest;
 import org.jetlinks.community.things.data.PropertyAggregation;
@@ -37,7 +37,6 @@ import org.jetlinks.community.things.data.ThingsDataUtils;
 import org.jetlinks.community.things.data.operations.ColumnModeQueryOperationsBase;
 import org.jetlinks.community.things.data.operations.DataSettings;
 import org.jetlinks.community.things.data.operations.MetricBuilder;
-import org.jetlinks.community.things.data.operations.RowModeQueryOperationsBase;
 import org.jetlinks.community.timescaledb.TimescaleDBUtils;
 import org.jetlinks.community.timeseries.TimeSeriesData;
 import org.jetlinks.community.timeseries.query.Aggregation;
@@ -122,7 +121,11 @@ public class TimescaleDBColumnModeQueryOperations extends ColumnModeQueryOperati
         if (request.getInterval() != null) {
             NativeSelectColumn column = createTimeGroupColumn(
                 request.getFrom().getTime(),
-                request.getInterval()
+                request.getInterval(),
+                database.getMetadata()
+                        .getFeatureNow(TimescaleDBPropertiesFeature.ID)
+                        .getProperties()
+                        .getFunctionSchema()
             );
             query.groupBy(column);
             query.select(column);

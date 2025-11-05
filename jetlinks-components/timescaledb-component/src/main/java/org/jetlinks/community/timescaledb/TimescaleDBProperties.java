@@ -22,6 +22,8 @@ import org.jetlinks.community.timescaledb.impl.DefaultTimescaleDBDataWriter;
 import org.springframework.boot.autoconfigure.r2dbc.R2dbcProperties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.util.Objects;
+
 @ConfigurationProperties(prefix = "timescaledb")
 @Getter
 @Setter
@@ -38,6 +40,15 @@ public class TimescaleDBProperties {
 
     //数据库的schema
     private String schema = "public";
+
+    /**
+     * TimescaleDB超表函数所在的位置
+     */
+    private String functionSchema = null;
+
+    public String getFunctionSchema() {
+        return functionSchema == null ? schema : functionSchema;
+    }
 
     /**
      * 写入缓冲区配置

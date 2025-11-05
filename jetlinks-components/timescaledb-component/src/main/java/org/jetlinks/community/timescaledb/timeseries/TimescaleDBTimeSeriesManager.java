@@ -20,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.hswebframework.ezorm.rdb.codec.DateTimeCodec;
 import org.hswebframework.ezorm.rdb.metadata.RDBIndexMetadata;
 import org.hswebframework.ezorm.rdb.operator.ddl.TableBuilder;
+import org.jetlinks.community.timescaledb.TimescaleDBProperties;
 import org.jetlinks.core.metadata.PropertyMetadata;
 import org.jetlinks.community.Interval;
 import org.jetlinks.community.things.data.ThingsDataConstants;
@@ -47,6 +48,8 @@ public class TimescaleDBTimeSeriesManager implements TimeSeriesManager {
     private final TimescaleDBTimeSeriesProperties properties;
 
     private final TimescaleDBOperations operations;
+
+    private final TimescaleDBProperties timescaleDBProperties;
 
     @Override
     public TimeSeriesService getService(TimeSeriesMetric metric) {
