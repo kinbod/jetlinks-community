@@ -31,10 +31,7 @@ import org.jetlinks.core.device.DeviceState;
 import org.jetlinks.core.device.session.DeviceSessionEvent;
 import org.jetlinks.core.message.codec.DefaultTransport;
 import org.jetlinks.core.rpc.RpcManager;
-import org.jetlinks.core.server.session.DeviceSession;
-import org.jetlinks.core.server.session.DeviceSessionProvider;
-import org.jetlinks.core.server.session.LostDeviceSession;
-import org.jetlinks.core.server.session.PersistentSession;
+import org.jetlinks.core.server.session.*;
 import org.jetlinks.core.utils.Reactors;
 import org.jetlinks.core.utils.RecyclerUtils;
 import org.jetlinks.community.codec.Serializers;
@@ -202,19 +199,19 @@ public class PersistenceDeviceSessionManager extends ClusterDeviceSessionManager
                     if (ctx.hasKey(PersistenceDeviceSessionManager.class)) {
                         return Mono.empty();
                     }
-                    //持久化
-                    if (event.getSession().isWrapFrom(PersistentSession.class)) {
-                        if (event.getType() == DeviceSessionEvent.Type.unregister) {
-                            return removePersistentSession(event.getSession().unwrap(PersistentSession.class));
-                        }
-                    } else if (recordHistory) {
+                    boolean isPersistent
+                        = !(event.getSession() instanceof ChildrenDeviceSession)
+                        && event.getSession().isWrapFrom(PersistentSession.class);
+
+                    if (recordHistory && !isPersistent) {
                         //记录历史设备
                         if (event.getType() == DeviceSessionEvent.Type.register) {
                             return this
                                 .operateInStore(
                                     () -> history,
-                                    history -> history.put(event.getSession().getDeviceId(),
-                                                           event.getSession().connectTime())
+                                    history -> history
+                                        .put(event.getSession().getDeviceId(),
+                                             event.getSession().connectTime())
                                 )
                                 .then();
                         }
@@ -227,6 +224,10 @@ public class PersistenceDeviceSessionManager extends ClusterDeviceSessionManager
                                 .then();
                         }
                     }
+                    if (event.getType() == DeviceSessionEvent.Type.unregister && isPersistent && !isShutdown()) {
+                        return removePersistentSession(event.getSession().unwrap(PersistentSession.class));
+                    }
+
                     return Mono.empty();
                 }))
         );
