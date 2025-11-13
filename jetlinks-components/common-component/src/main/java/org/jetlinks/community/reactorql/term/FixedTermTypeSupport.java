@@ -90,25 +90,25 @@ public enum FixedTermTypeSupport implements TermTypeSupport {
     gt("大于", "gt", DateTimeType.ID, ShortType.ID, IntType.ID, LongType.ID, FloatType.ID, DoubleType.ID) {
         @Override
         public boolean matchBlocking(Object expect, Object actual) {
-            return CompareUtils.compare(expect, actual) > 0;
+            return CompareUtils.compare(actual, expect) > 0;
         }
     },
     gte("大于等于", "gte", DateTimeType.ID, ShortType.ID, IntType.ID, LongType.ID, FloatType.ID, DoubleType.ID) {
         @Override
         public boolean matchBlocking(Object expect, Object actual) {
-            return CompareUtils.compare(expect, actual) >= 0;
+            return CompareUtils.compare(actual, expect) >= 0;
         }
     },
     lt("小于", "lt", DateTimeType.ID, ShortType.ID, IntType.ID, LongType.ID, FloatType.ID, DoubleType.ID) {
         @Override
         public boolean matchBlocking(Object expect, Object actual) {
-            return CompareUtils.compare(expect, actual) < 0;
+            return CompareUtils.compare(actual, expect) < 0;
         }
     },
     lte("小于等于", "lte", DateTimeType.ID, ShortType.ID, IntType.ID, LongType.ID, FloatType.ID, DoubleType.ID) {
         @Override
         public boolean matchBlocking(Object expect, Object actual) {
-            return CompareUtils.compare(expect, actual) <= 0;
+            return CompareUtils.compare(actual, expect) <= 0;
         }
     },
 
