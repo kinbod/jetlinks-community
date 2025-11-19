@@ -52,6 +52,23 @@ public class Interval {
 
     private String expression;
 
+    public Interval(String expr) {
+        char[] chars = expr.toCharArray();
+        int numIndex = 0;
+        for (char c : expr.toCharArray()) {
+            if (c == '-' || c == '.' || (c >= '0' && c <= '9')) {
+                numIndex++;
+            } else {
+                BigDecimal val = new BigDecimal(chars, 0, numIndex);
+                this.expression = expr.substring(numIndex);
+                this.number = val;
+            }
+        }
+        if (this.expression == null) {
+            throw new IllegalArgumentException("can not parse interval expression:" + expr);
+        }
+    }
+
     @Override
     public String toString() {
         return (number) + expression;
@@ -65,6 +82,11 @@ public class Interval {
     @Generated
     public static Interval ofDays(int days) {
         return of(days, Interval.days);
+    }
+
+    @Generated
+    public static Interval ofWeeks(int weeks) {
+        return of(weeks, Interval.weeks);
     }
 
     @Generated
@@ -88,20 +110,7 @@ public class Interval {
     }
 
     public static Interval of(String expr) {
-
-        char[] chars = expr.toCharArray();
-        int numIndex = 0;
-        for (char c : expr.toCharArray()) {
-            if (c == '-' || c == '.' || (c >= '0' && c <= '9')) {
-                numIndex++;
-            } else {
-                BigDecimal val = new BigDecimal(chars, 0, numIndex);
-                return new Interval(val, expr.substring(numIndex));
-            }
-
-        }
-
-        throw new IllegalArgumentException("can not parse interval expression:" + expr);
+        return new Interval(expr);
     }
 
     public String getDefaultFormat() {

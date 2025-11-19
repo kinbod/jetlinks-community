@@ -15,13 +15,21 @@
  */
 package org.jetlinks.community.elastic.search.utils;
 
+import co.elastic.clients.elasticsearch._types.mapping.Property;
+import co.elastic.clients.elasticsearch.core.SearchResponse;
 import com.google.common.collect.Collections2;
+import org.jetlinks.community.elastic.search.enums.ElasticPropertyType;
+import org.jetlinks.community.elastic.search.index.ElasticSearchIndexMetadata;
 import org.jetlinks.core.metadata.Converter;
 import org.jetlinks.core.metadata.DataType;
 import org.jetlinks.core.metadata.PropertyMetadata;
+import org.jetlinks.core.metadata.SimplePropertyMetadata;
 import org.jetlinks.core.metadata.types.*;
+import reactor.core.publisher.Flux;
 
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class ElasticSearchConverter {
 
@@ -92,5 +100,60 @@ public class ElasticSearchConverter {
             }
         }
         return newData;
+    }
+
+
+    @SuppressWarnings("all")
+    public static List<PropertyMetadata> convertProperties(Map<String, Property> properties) {
+        return properties
+            .entrySet()
+            .stream()
+            .map(entry -> convertProperty(entry.getKey(), entry.getValue()))
+            .collect(Collectors.toList());
+
+    }
+
+    private static PropertyMetadata convertProperty(String property, Property prop) {
+        SimplePropertyMetadata metadata = new SimplePropertyMetadata();
+        metadata.setId(property);
+        metadata.setName(property);
+        ElasticPropertyType elasticPropertyType = ElasticPropertyType.of(prop._kind().jsonValue());
+        if (null != elasticPropertyType) {
+            DataType dataType = elasticPropertyType.getType();
+            if (dataType instanceof ObjectType objectType) {
+                if (elasticPropertyType == ElasticPropertyType.OBJECT) {
+                    objectType.setProperties(convertProperties(prop.object().properties()));
+                } else if (elasticPropertyType == ElasticPropertyType.NESTED) {
+                    objectType.setProperties(convertProperties(prop.nested().properties()));
+                }
+            }
+            metadata.setValueType(dataType);
+        } else {
+            metadata.setValueType(StringType.GLOBAL);
+        }
+        return metadata;
+    }
+
+    public static <T> Flux<T> convertQueryResult(List<ElasticSearchIndexMetadata> indexList,
+                                                 SearchResponse<Map> response,
+                                                 Function<Map<String, Object>, T> mapper) {
+        Map<String, ElasticSearchIndexMetadata> metadata = indexList
+            .stream()
+            .collect(Collectors.toMap(ElasticSearchIndexMetadata::getIndex, Function.identity()));
+
+        return Flux
+            .fromIterable(response.hits().hits())
+            .mapNotNull(hit -> {
+                Map<String, Object> hitMap = hit.source();
+                if (hitMap == null) {
+                    return null;
+                }
+                hitMap.putIfAbsent("id", hit.id());
+                return mapper
+                    .apply(Optional
+                               .ofNullable(metadata.get(hit.index())).orElse(indexList.get(0))
+                               .convertFromElastic(hitMap));
+            });
+
     }
 }

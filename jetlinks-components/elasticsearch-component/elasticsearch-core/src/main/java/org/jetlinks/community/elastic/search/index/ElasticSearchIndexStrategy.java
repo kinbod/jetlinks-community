@@ -15,7 +15,13 @@
  */
 package org.jetlinks.community.elastic.search.index;
 
+import org.hswebframework.ezorm.core.param.QueryParam;
 import reactor.core.publisher.Mono;
+
+import javax.annotation.Nullable;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 /**
  * es 索引策略
@@ -48,6 +54,14 @@ public interface ElasticSearchIndexStrategy {
      */
     String getIndexForSearch(String index);
 
+    default String getIndexForSave(ElasticSearchIndexMetadata index, Map<String, Object> data) {
+        return getIndexForSave(index.getIndex());
+    }
+
+    default List<String> getIndexForSearch(ElasticSearchIndexMetadata index, @Nullable QueryParam param) {
+        return Collections.singletonList(getIndexForSearch(index.getIndex()));
+    }
+
     /**
      * 更新索引
      *
@@ -58,6 +72,7 @@ public interface ElasticSearchIndexStrategy {
 
     /**
      * 加载索引元数据
+     *
      * @param index 索引
      * @return 索引元数据
      */

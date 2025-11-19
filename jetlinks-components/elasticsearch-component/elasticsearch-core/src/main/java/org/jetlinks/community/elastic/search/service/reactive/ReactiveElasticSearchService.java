@@ -47,6 +47,8 @@ import org.hswebframework.web.api.crud.entity.QueryParamEntity;
 import org.hswebframework.web.bean.FastBeanCopier;
 import org.hswebframework.web.exception.BusinessException;
 import org.jetlinks.community.configure.cluster.Cluster;
+import org.jetlinks.community.elastic.search.index.ElasticSearchIndex;
+import org.jetlinks.community.elastic.search.utils.ElasticSearchConverter;
 import org.jetlinks.core.metadata.Jsonable;
 import org.jetlinks.core.trace.MonoTracer;
 import org.jetlinks.core.utils.SerializeUtils;
@@ -85,7 +87,6 @@ import java.util.stream.Collectors;
  **/
 @Slf4j
 public class ReactiveElasticSearchService implements ElasticSearchService, CommandLineRunner {
-
     static AttributeKey<Long> BUFFER_SIZE = AttributeKey.longKey("bufferSize");
 
     @Getter
@@ -156,72 +157,47 @@ public class ReactiveElasticSearchService implements ElasticSearchService, Comma
         if (queryParam.isPaging()) {
             return this
                 .doQuery(index, queryParam)
-                .flatMapMany(tp2 -> convertQueryResult(tp2.getT1(), tp2.getT2(), mapper));
+                .flatMapMany(tp2 -> ElasticSearchConverter
+                    .convertQueryResult(Lists.transform(tp2.getT1(), ElasticSearchIndex::getMetadata), tp2.getT2(), mapper));
         }
         return this.doScrollQuery(index, queryParam, mapper);
     }
 
     @Override
     public <T> Mono<PagerResult<T>> queryPager(String[] index, QueryParam queryParam, Function<Map<String, Object>, T> mapper) {
-        if (!queryParam.isPaging()) {
-            return Mono
-                .zip(
-                    this.count(index, queryParam),
-                    this.query(index, queryParam, mapper).collectList(),
-                    (total, list) -> PagerResult.of(total.intValue(), list, queryParam)
-                )
-                .switchIfEmpty(Mono.fromSupplier(PagerResult::empty));
-        }
-        return this
-            .doQuery(index, queryParam)
-            .flatMap(tp2 -> this
-                .convertQueryResult(tp2.getT1(), tp2.getT2(), mapper)
-                .collectList()
-                .filter(CollectionUtils::isNotEmpty)
-                .map(list -> PagerResult.of((int) tp2
-                    .getT2()
-                    .hits().total().value(), list, queryParam))
+        //if (!queryParam.isPaging()) {
+        return Mono
+            .zip(
+                this.count(index, queryParam),
+                this.query(index, queryParam, mapper).collectList(),
+                (total, list) -> PagerResult.of(total.intValue(), list, queryParam)
             )
             .switchIfEmpty(Mono.fromSupplier(PagerResult::empty));
+//        }
+//        return this
+//            .doQuery(index, queryParam)
+//            .flatMap(tp2 -> ElasticSearchConverter
+//                .convertQueryResult(tp2.getT1(), tp2.getT2(), mapper)
+//                .collectList()
+//                .filter(CollectionUtils::isNotEmpty)
+//                .map(list -> PagerResult.of((int) tp2
+//                    .getT2()
+//                    .hits().total().value(), list, queryParam))
+//            )
+//            .switchIfEmpty(Mono.fromSupplier(PagerResult::empty));
     }
 
-    private <T> Flux<T> convertQueryResult(List<ElasticSearchIndexMetadata> indexList,
-                                           SearchResponse<Map> response,
-                                           Function<Map<String, Object>, T> mapper) {
-        Map<String, ElasticSearchIndexMetadata> metadata = indexList
-            .stream()
-            .collect(Collectors.toMap(ElasticSearchIndexMetadata::getIndex, Function.identity()));
-
-        return Flux
-            .fromIterable(response.hits().hits())
-            .mapNotNull(hit -> {
-                Map<String, Object> hitMap = hit.source();
-                if (hitMap == null) {
-                    return null;
-                }
-                hitMap.putIfAbsent("id", hit.id());
-                return mapper
-                    .apply(Optional
-                               .ofNullable(metadata.get(hit.index())).orElse(indexList.get(0))
-                               .convertFromElastic(hitMap));
-            });
-
-    }
-
-    private Mono<Tuple2<List<ElasticSearchIndexMetadata>, SearchResponse<Map>>>
-    doQuery(String[] index,
-            QueryParam queryParam) {
+    private Mono<Tuple2<List<ElasticSearchIndex>, SearchResponse<Map>>> doQuery(String[] index,
+                                                                                QueryParam queryParam) {
         return indexManager
-            .getIndexesMetadata(index)
-            .collectList()
+            .getIndexes(index)
             .filter(CollectionUtils::isNotEmpty)
             .flatMap(metadataList -> this
                 .createSearchRequest(queryParam, metadataList)
                 .flatMap(request -> restClient
                     .execute(c -> c.search(request, Map.class)))
                 .map(response -> Tuples.of(metadataList, response))
-            )
-            ;
+            );
     }
 
     private <T> Flux<T> doScrollQuery(String[] index,
@@ -230,8 +206,7 @@ public class ReactiveElasticSearchService implements ElasticSearchService, Comma
         Time time = Time.of(t -> t.time("10m"));
 
         return indexManager
-            .getIndexesMetadata(index)
-            .collectList()
+            .getIndexes(index)
             .filter(CollectionUtils::isNotEmpty)
             .flatMapMany(metadataList -> this
                 .createSearchRequest(queryParam.clone().noPaging(), metadataList)
@@ -244,6 +219,8 @@ public class ReactiveElasticSearchService implements ElasticSearchService, Comma
                         builder.query(search.query());
                         builder.sort(search.sort());
                         builder.size(getNoPagingPageSize(queryParam));
+                        builder.ignoreUnavailable(search.ignoreUnavailable());
+                        builder.allowNoIndices(search.allowNoIndices());
                     }))
             );
     }
@@ -256,6 +233,8 @@ public class ReactiveElasticSearchService implements ElasticSearchService, Comma
     public Mono<Long> count(String[] index, QueryParam queryParam) {
         QueryParam param = queryParam.clone();
         param.setPaging(false);
+        // 不排序
+        param.setSorts(new ArrayList<>());
         return this
             .createSearchRequest(param, index)
             .flatMap(this::doCount)
@@ -354,7 +333,7 @@ public class ReactiveElasticSearchService implements ElasticSearchService, Comma
     private void init() {
 
         writer = new PersistenceBuffer<>(
-            BufferSettings.create(Cluster.safeId() + ".queue", buffer),
+            BufferSettings.create(Cluster.id() + ".queue", buffer),
             Buffer::new,
             this::doSaveBuffer)
             .name("elasticsearch")
@@ -451,7 +430,7 @@ public class ReactiveElasticSearchService implements ElasticSearchService, Comma
 
         String index;
         String id;
-        Object payload;
+        Map<String, Object> payload;
 
         @Override
         public JSONObject toJson() {
@@ -487,7 +466,7 @@ public class ReactiveElasticSearchService implements ElasticSearchService, Comma
         public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
             index = in.readUTF();
             id = SerializeUtils.readNullableUTF(in);
-            payload = SerializeUtils.readObject(in);
+            payload = SerializeUtils.readObjectAs(in);
         }
 
         @Override
@@ -501,10 +480,8 @@ public class ReactiveElasticSearchService implements ElasticSearchService, Comma
         }
     }
 
-    private Mono<String> getIndexForSave(String index) {
-        return indexManager
-            .getIndexStrategy(index)
-            .map(strategy -> strategy.getIndexForSave(index));
+    private Mono<ElasticSearchIndex> getIndexForSave(String index) {
+        return indexManager.getIndex(index);
 
     }
 
@@ -530,7 +507,7 @@ public class ReactiveElasticSearchService implements ElasticSearchService, Comma
                                 if (buffer.id != null && !this.buffer.isIgnoreDocId()) {
                                     b.id(buffer.id);
                                 }
-                                b.index(realIndex);
+                                b.index(realIndex.getForSave(buffer.payload));
                                 b.document(buffer.payload);
                                 return b;
                             })));
@@ -630,6 +607,8 @@ public class ReactiveElasticSearchService implements ElasticSearchService, Comma
             .execute(c -> c
                 .count(ct -> {
                     ct.index(request.index())
+                      .ignoreUnavailable(request.ignoreUnavailable())
+                      .allowNoIndices(request.allowNoIndices())
                       .query(request.query());
                     return ct;
                 }).count());
@@ -638,26 +617,27 @@ public class ReactiveElasticSearchService implements ElasticSearchService, Comma
     protected Mono<SearchRequest> createSearchRequest(QueryParam queryParam,
                                                       String... indexes) {
         return indexManager
-            .getIndexesMetadata(indexes)
-            .collectList()
+            .getIndexes(indexes)
             .filter(CollectionUtils::isNotEmpty)
             .flatMap(list -> createSearchRequest(queryParam, list));
     }
 
     protected int computeTrackHits(QueryParam param) {
-        if (param instanceof QueryParamEntity p) {
-            if (p.getTotal() != null) {
-                return 0;
-            }
-        }
-        return param.isPaging() ? Integer.MAX_VALUE : 0;
+        // 单独查询count. 不再track hits.
+        return 0;
+//        if (param instanceof QueryParamEntity p) {
+//            //if (p.getTotal() != null) {
+//                return 0;
+//           // }
+//        }
+//        return param.isPaging() ? Integer.MAX_VALUE : 0;
     }
 
-    protected Mono<SearchRequest> createSearchRequest(QueryParam queryParam, List<ElasticSearchIndexMetadata> indexes) {
+    protected Mono<SearchRequest> createSearchRequest(QueryParam queryParam, List<ElasticSearchIndex> indexes) {
 
         return Flux
             .fromIterable(indexes)
-            .flatMap(index -> getIndexForSearch(index.getIndex()))
+            .flatMapIterable(index -> index.getForSearch(queryParam))
             .collectList()
             .map(indexList -> SearchRequest.of(
                 builder -> {
@@ -666,9 +646,10 @@ public class ReactiveElasticSearchService implements ElasticSearchService, Comma
                     int track = computeTrackHits(queryParam);
                     builder.trackTotalHits(TrackHits.of(b -> track <= 0 ? b.enabled(false) : b.count(track)));
                     builder.index(indexList);
-                    return QueryParamTranslator.convertSearchRequestBuilder(builder, queryParam, indexes.get(0));
+                    return QueryParamTranslator.convertSearchRequestBuilder(builder, queryParam, indexes
+                        .get(0)
+                        .getMetadata());
                 }));
     }
-
 
 }

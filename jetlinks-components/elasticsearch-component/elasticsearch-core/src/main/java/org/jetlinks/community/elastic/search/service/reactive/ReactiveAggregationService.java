@@ -387,10 +387,7 @@ public class ReactiveAggregationService implements AggregationService {
         return bucketFlux
             .concatMap(bucket -> Flux
                 .fromIterable(bucket.aggregations().entrySet())
-                .concatMap(e -> {
-
-                    return parseAggregation(e.getKey(), e.getValue(), bucket.docCount());
-                }, 0)
+                .concatMap(e -> parseAggregation(e.getKey(), e.getValue(), bucket.docCount()), 0)
                 .map(map -> transformBucket(name, map, bucket)), 0);
 
     }

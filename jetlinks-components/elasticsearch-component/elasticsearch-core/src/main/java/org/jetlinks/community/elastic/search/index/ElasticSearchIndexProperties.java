@@ -16,10 +16,7 @@
 package org.jetlinks.community.elastic.search.index;
 
 import co.elastic.clients.elasticsearch.indices.IndexSettings;
-import co.elastic.clients.json.JsonData;
-import com.google.common.collect.Maps;
 import lombok.*;
-import org.apache.commons.collections4.MapUtils;
 import org.jetlinks.community.elastic.search.ElasticSearchSupport;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -55,12 +52,12 @@ public class ElasticSearchIndexProperties {
     //设置为false时,将使用*进行搜索.在一些特殊请求,如索引名前缀类似时可能搜索到错误的数据.
     private boolean useAliasSearch = true;
 
+    private Map<String, ElasticSearchIndexProperties> indexCustomizer = new HashMap<>();
 
-    public IndexSettings.Builder toSettings(IndexSettings.Builder builder) {
-
+    public IndexSettings.Builder toSettings(String index, IndexSettings.Builder builder) {
         return ElasticSearchSupport
             .current()
-            .applyIndexSettings(this, builder);
+            .applyIndexSettings(indexCustomizer.getOrDefault(index, this), builder);
 
     }
 

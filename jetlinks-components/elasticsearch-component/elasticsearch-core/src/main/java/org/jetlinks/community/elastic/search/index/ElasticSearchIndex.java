@@ -15,11 +15,18 @@
  */
 package org.jetlinks.community.elastic.search.index;
 
-/**
- * @version 1.0
- **/
-@Deprecated
-public interface ElasticIndex {
+import org.hswebframework.ezorm.core.param.QueryParam;
 
-    String getIndex();
+import java.util.List;
+import java.util.Map;
+
+public interface ElasticSearchIndex {
+
+    ElasticSearchIndexMetadata getMetadata();
+
+    List<String> getForSearch(QueryParam searchParam);
+
+    String getForSave(Map<String, Object> data);
+
+    List<String> getForSearch();
 }

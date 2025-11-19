@@ -15,24 +15,34 @@
  */
 package org.jetlinks.community.elastic.search.index.strategies;
 
+import org.jetlinks.community.Interval;
 import org.jetlinks.community.elastic.search.index.ElasticSearchIndexProperties;
 import org.jetlinks.community.elastic.search.service.reactive.ReactiveElasticsearchClient;
 
 import java.time.Clock;
 import java.time.LocalDate;
-
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
 /**
  * 按月对来划分索引策略
  *
  * @author zhouhao
  * @since 1.0
  */
-public class TimeByMonthElasticSearchIndexStrategy extends TemplateElasticSearchIndexStrategy {
+public class TimeByMonthElasticSearchIndexStrategy extends TimebaseElasticSearchIndexStrategy {
 
     private static final Clock CLOCK = Clock.systemDefaultZone();
 
+    static final Interval INTERVAL = Interval.ofMonth(1);
+
     public TimeByMonthElasticSearchIndexStrategy(ReactiveElasticsearchClient client, ElasticSearchIndexProperties properties) {
         super("time-by-month", client, properties);
+    }
+
+    @Override
+    protected List<String> getIndexPatterns(String index) {
+        return Collections.singletonList(wrapIndex(index).concat("_*-*"));
     }
 
     @Override
@@ -40,5 +50,17 @@ public class TimeByMonthElasticSearchIndexStrategy extends TemplateElasticSearch
         LocalDate now = LocalDate.now(CLOCK);
         String idx = wrapIndex(index);
         return idx + "_" + now.getYear() + "-" + now.getMonthValue();
+    }
+
+
+    @Override
+    protected String getIndexForSave(String index, LocalDateTime time) {
+        String idx = wrapIndex(index);
+        return idx + "_" + time.getYear() + "-" + time.getMonthValue();
+    }
+
+    @Override
+    protected Interval getInterval() {
+        return INTERVAL;
     }
 }

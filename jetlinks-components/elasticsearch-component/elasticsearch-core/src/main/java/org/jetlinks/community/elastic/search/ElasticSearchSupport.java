@@ -20,6 +20,7 @@ import co.elastic.clients.elasticsearch._types.aggregations.HistogramBucket;
 import co.elastic.clients.elasticsearch._types.aggregations.MultiBucketBase;
 import co.elastic.clients.elasticsearch._types.mapping.DynamicTemplate;
 import co.elastic.clients.elasticsearch._types.mapping.Property;
+import co.elastic.clients.elasticsearch._types.mapping.TypeMapping;
 import co.elastic.clients.elasticsearch.indices.*;
 import co.elastic.clients.elasticsearch.indices.get_mapping.IndexMappingRecord;
 import co.elastic.clients.json.JsonData;
@@ -101,6 +102,8 @@ public abstract class ElasticSearchSupport {
     public abstract IndexState getIndexState(GetIndexResponse response, String index);
 
     public abstract TemplateMapping getTemplateMapping(GetTemplateResponse response, String index);
+
+    public abstract TypeMapping getIndexTemplateMapping(GetIndexTemplateResponse response, String index);
 
     public abstract IndexMappingRecord getIndexMapping(GetMappingResponse response, String index);
 

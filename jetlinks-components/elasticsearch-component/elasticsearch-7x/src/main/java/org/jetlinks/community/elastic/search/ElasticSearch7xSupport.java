@@ -15,17 +15,22 @@
  */
 package org.jetlinks.community.elastic.search;
 
-import co.elastic.clients.elasticsearch._types.aggregations.DateHistogramBucket;
-import co.elastic.clients.elasticsearch._types.aggregations.HistogramBucket;
-import co.elastic.clients.elasticsearch._types.aggregations.MultiBucketBase;
+import co.elastic.clients.elasticsearch._types.aggregations.*;
 import co.elastic.clients.elasticsearch._types.mapping.DynamicTemplate;
 import co.elastic.clients.elasticsearch._types.mapping.Property;
+import co.elastic.clients.elasticsearch._types.mapping.TypeMapping;
 import co.elastic.clients.elasticsearch.indices.*;
+import co.elastic.clients.elasticsearch.indices.get_index_template.IndexTemplate;
+import co.elastic.clients.elasticsearch.indices.get_index_template.IndexTemplateItem;
+import co.elastic.clients.elasticsearch.indices.get_index_template.IndexTemplateSummary;
 import co.elastic.clients.elasticsearch.indices.get_mapping.IndexMappingRecord;
 import co.elastic.clients.transport.Version;
-import org.jetlinks.community.elastic.search.enums.ElasticSearchTermTypes;
 import org.jetlinks.community.elastic.search.enums.ElasticSearch7xTermType;
+import org.jetlinks.community.elastic.search.enums.ElasticSearchTermTypes;
 import org.jetlinks.community.elastic.search.index.ElasticSearchIndexProperties;
+import org.jetlinks.reactor.ql.utils.CastUtils;
+
+import java.util.Objects;
 
 public class ElasticSearch7xSupport extends ElasticSearchSupport {
 
@@ -60,6 +65,20 @@ public class ElasticSearch7xSupport extends ElasticSearchSupport {
     }
 
     @Override
+    public TypeMapping getIndexTemplateMapping(GetIndexTemplateResponse response, String index) {
+        for (IndexTemplateItem indexTemplate : response.indexTemplates()) {
+            if (Objects.equals(indexTemplate.name(), index)) {
+                IndexTemplate template = indexTemplate.indexTemplate();
+                IndexTemplateSummary summary = template.template();
+                if (summary != null) {
+                    return summary.mappings();
+                }
+            }
+        }
+        return null;
+    }
+
+    @Override
     public IndexState getIndexState(GetIndexResponse response, String index) {
         return response.get(index);
     }
@@ -71,6 +90,15 @@ public class ElasticSearch7xSupport extends ElasticSearchSupport {
 
     @Override
     public Object getBucketKey(MultiBucketBase bucket) {
+        if (bucket instanceof LongTermsBucket) {
+            return CastUtils.castNumber(((LongTermsBucket) bucket).key()).longValue();
+        }
+        if (bucket instanceof DoubleTermsBucket) {
+            return ((DoubleTermsBucket) bucket).key();
+        }
+        if (bucket instanceof StringTermsBucket) {
+            return ((StringTermsBucket) bucket).key()._get();
+        }
         if (bucket instanceof DateHistogramBucket _bucket) {
             return _bucket.key();
         }

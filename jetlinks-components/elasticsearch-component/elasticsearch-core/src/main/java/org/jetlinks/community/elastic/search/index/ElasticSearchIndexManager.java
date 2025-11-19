@@ -18,6 +18,9 @@ package org.jetlinks.community.elastic.search.index;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.Collections;
+import java.util.List;
+
 /**
  * ElasticSearch 索引管理器,用于统一管理,维护索引信息.
  *
@@ -52,6 +55,19 @@ public interface ElasticSearchIndexManager {
         return Flux
             .fromArray(index)
             .flatMap(this::getIndexMetadata);
+    }
+
+    Mono<ElasticSearchIndex> getIndex(String index);
+
+    default Mono<List<ElasticSearchIndex>> getIndexes(String... index) {
+        if (index.length == 1) {
+            return getIndex(index[0])
+                .map(Collections::singletonList);
+        }
+        return Flux
+            .fromArray(index)
+            .flatMap(this::getIndex)
+            .collectList();
     }
 
     /**
@@ -89,5 +105,6 @@ public interface ElasticSearchIndexManager {
      * @param strategy 策略
      */
     void registerStrategy(ElasticSearchIndexStrategy strategy);
+
 
 }

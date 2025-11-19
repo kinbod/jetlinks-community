@@ -20,23 +20,50 @@ import org.jetlinks.core.metadata.DataType;
 import org.jetlinks.core.metadata.PropertyMetadata;
 import org.jetlinks.core.metadata.SimplePropertyMetadata;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class DefaultElasticSearchIndexMetadata implements ElasticSearchIndexMetadata {
     private final String index;
 
-    private final Map<String, PropertyMetadata> properties = new HashMap<>();
+    private final Map<String, PropertyMetadata> properties = new LinkedHashMap<>();
+
+    private final String timestampProperty;
+
+    private final Map<String, Object> settings = new HashMap<>();
 
     public DefaultElasticSearchIndexMetadata(String index) {
+        this(index, "timestamp");
+    }
+
+    public DefaultElasticSearchIndexMetadata(String index, String timestampProperty) {
         this.index = index.toLowerCase().trim();
+        this.timestampProperty = timestampProperty;
     }
 
     public DefaultElasticSearchIndexMetadata(String index, List<PropertyMetadata> properties) {
         this(index);
         properties.forEach(this::addProperty);
+    }
+
+    public DefaultElasticSearchIndexMetadata(String index, List<PropertyMetadata> properties, String timestampProperty) {
+        this(index, timestampProperty);
+        properties.forEach(this::addProperty);
+    }
+
+    @Override
+    public Map<String, Object> getSettings() {
+        return settings;
+    }
+
+    public DefaultElasticSearchIndexMetadata withSetting(String key, Object value){
+        settings.put(key,value);
+        return this;
+    }
+
+
+    @Override
+    public PropertyMetadata getTimestampProperty() {
+        return getProperty(timestampProperty);
     }
 
     @Override
@@ -68,5 +95,15 @@ public class DefaultElasticSearchIndexMetadata implements ElasticSearchIndexMeta
         metadata.setId(property);
         addProperty(metadata);
         return this;
+    }
+
+    @Override
+    public ElasticSearchIndexMetadata newIndexName(String name) {
+        DefaultElasticSearchIndexMetadata metadata = new DefaultElasticSearchIndexMetadata(
+            name,new ArrayList<>(properties.values()),timestampProperty
+        );
+        metadata.settings.putAll(settings);
+
+        return metadata;
     }
 }

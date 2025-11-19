@@ -18,12 +18,9 @@ package org.jetlinks.community.elastic.search.index;
 import lombok.Generated;
 import lombok.Getter;
 import lombok.Setter;
-import org.apache.commons.collections4.map.CaseInsensitiveMap;
-import org.jetlinks.core.cache.Caches;
+import org.hswebframework.ezorm.core.param.QueryParam;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -74,6 +71,35 @@ public class DefaultElasticSearchIndexManager implements ElasticSearchIndexManag
                    .flatMap(strategy -> strategy.putIndex(index))
                    .doOnNext(idx -> indexMetadataStore.put(idx.getIndex(), idx))
                    .then();
+    }
+
+    @Override
+    public Mono<ElasticSearchIndex> getIndex(String index) {
+        return Mono.zip(
+            getIndexMetadata(index),
+            getIndexStrategy(index),
+            (metadata, strategy) ->
+                new ElasticSearchIndex() {
+                    @Override
+                    public ElasticSearchIndexMetadata getMetadata() {
+                        return metadata;
+                    }
+
+                    @Override
+                    public List<String> getForSearch(QueryParam searchParam) {
+                        return strategy.getIndexForSearch(metadata, searchParam);
+                    }
+
+                    @Override
+                    public String getForSave(Map<String, Object> data) {
+                        return strategy.getIndexForSave(metadata, data);
+                    }
+
+                    @Override
+                    public List<String> getForSearch() {
+                        return strategy.getIndexForSearch(metadata, null);
+                    }
+                });
     }
 
     @Override

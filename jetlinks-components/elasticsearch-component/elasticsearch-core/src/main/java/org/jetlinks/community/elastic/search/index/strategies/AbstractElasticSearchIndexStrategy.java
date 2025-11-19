@@ -18,25 +18,34 @@ package org.jetlinks.community.elastic.search.index.strategies;
 import co.elastic.clients.elasticsearch._types.mapping.DynamicTemplate;
 import co.elastic.clients.elasticsearch._types.mapping.Property;
 import co.elastic.clients.elasticsearch._types.mapping.TypeMapping;
+import co.elastic.clients.elasticsearch.indices.IndexSettings;
 import co.elastic.clients.elasticsearch.indices.PutMappingRequest;
 import co.elastic.clients.elasticsearch.indices.get_mapping.IndexMappingRecord;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.jetlinks.core.metadata.DataType;
-import org.jetlinks.core.metadata.PropertyMetadata;
-import org.jetlinks.core.metadata.SimplePropertyMetadata;
-import org.jetlinks.core.metadata.types.*;
 import org.jetlinks.community.ConfigMetadataConstants;
 import org.jetlinks.community.elastic.search.ElasticSearchSupport;
 import org.jetlinks.community.elastic.search.enums.ElasticDateFormat;
-import org.jetlinks.community.elastic.search.enums.ElasticPropertyType;
 import org.jetlinks.community.elastic.search.index.DefaultElasticSearchIndexMetadata;
 import org.jetlinks.community.elastic.search.index.ElasticSearchIndexMetadata;
 import org.jetlinks.community.elastic.search.index.ElasticSearchIndexProperties;
 import org.jetlinks.community.elastic.search.index.ElasticSearchIndexStrategy;
 import org.jetlinks.community.elastic.search.service.reactive.ReactiveElasticsearchClient;
+import org.jetlinks.community.elastic.search.utils.ElasticSearchConverter;
+import org.jetlinks.core.metadata.DataType;
+import org.jetlinks.core.metadata.PropertyMetadata;
+import org.jetlinks.core.metadata.types.*;
+import org.jetlinks.community.ConfigMetadataConstants;
+import org.jetlinks.community.elastic.search.ElasticSearchSupport;
+import org.jetlinks.community.elastic.search.enums.ElasticDateFormat;
+import org.jetlinks.community.elastic.search.index.DefaultElasticSearchIndexMetadata;
+import org.jetlinks.community.elastic.search.index.ElasticSearchIndexMetadata;
+import org.jetlinks.community.elastic.search.index.ElasticSearchIndexProperties;
+import org.jetlinks.community.elastic.search.index.ElasticSearchIndexStrategy;
+import org.jetlinks.community.elastic.search.service.reactive.ReactiveElasticsearchClient;
+import org.jetlinks.community.elastic.search.utils.ElasticSearchConverter;
 import org.jetlinks.reactor.ql.utils.CastUtils;
 import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Mono;
@@ -128,7 +137,26 @@ public abstract class AbstractElasticSearchIndexStrategy implements ElasticSearc
                        ElasticSearchIndexMetadata metadata) {
         builder.index(wrapIndex(metadata.getIndex()));
 
-        builder.settings(properties::toSettings);
+        builder.settings(b -> {
+            Map<String, Object> settings = metadata.getSettings();
+            IndexSettings.Builder _b = properties.toSettings(metadata.getIndex(), b);
+
+//            // index.routing_path
+//            {
+//                List<String> routePath = ConverterUtils
+//                    .convertToList(settings.get(Headers.routeKey.getKey()),
+//                                   String::valueOf);
+//                if (!CollectionUtils.isEmpty(routePath)) {
+//                    _b = _b.routingPath(routePath);
+//                }
+//            }
+//              fixme 兼容有nested字段不能使用排序.
+//            PropertyMetadata ts = metadata.getTimestampProperty();
+//            if (ts != null) {
+//                _b.sort(s -> s.field(ts.getId()).order(SegmentSortOrder.Desc));
+//            }
+            return _b;
+        });
 
         builder.mappings(b -> {
 
@@ -142,10 +170,10 @@ public abstract class AbstractElasticSearchIndexStrategy implements ElasticSearc
         return builder;
     }
 
-    private co.elastic.clients.elasticsearch.indices.PutMappingRequest.Builder
+    private PutMappingRequest.Builder
     createPutMappingRequest(ElasticSearchIndexMetadata metadata,
                             ElasticSearchIndexMetadata ignore,
-                            co.elastic.clients.elasticsearch.indices.PutMappingRequest.Builder builder) {
+                            PutMappingRequest.Builder builder) {
         Map<String, Property> properties = createElasticProperties(metadata.getProperties());
         Map<String, Property> ignoreProperties = createElasticProperties(ignore.getProperties());
         for (Map.Entry<String, Property> en : ignoreProperties.entrySet()) {
@@ -174,8 +202,9 @@ public abstract class AbstractElasticSearchIndexStrategy implements ElasticSearc
         }
         return metadata
             .stream()
-            .collect(Collectors.toMap(PropertyMetadata::getId,
-                                      prop -> this.createElasticProperty(prop.getValueType()), (a, v) -> a));
+            .collect(Collectors.toMap(
+                PropertyMetadata::getId,
+                prop -> this.createElasticProperty(prop.getValueType()), (a, v) -> a));
     }
 
     protected Property createElasticProperty(DataType type) {
@@ -183,6 +212,7 @@ public abstract class AbstractElasticSearchIndexStrategy implements ElasticSearc
         if (type instanceof DateTimeType) {
             return Property.of(b -> b
                 .date(b2 -> b2
+                    .docValues(true)
                     .format(
                         ElasticDateFormat.getFormat(
                             ElasticDateFormat.epoch_millis,
@@ -232,39 +262,8 @@ public abstract class AbstractElasticSearchIndexStrategy implements ElasticSearc
         Map<String, Property> properties = mapping.properties();
 
 
-        return new DefaultElasticSearchIndexMetadata(index, convertProperties(properties));
+        return new DefaultElasticSearchIndexMetadata(index, ElasticSearchConverter.convertProperties(properties));
     }
-
-    @SuppressWarnings("all")
-    protected List<PropertyMetadata> convertProperties(Map<String, Property> properties) {
-        return properties
-            .entrySet()
-            .stream()
-            .map(entry -> convertProperty(entry.getKey(), entry.getValue()))
-            .collect(Collectors.toList());
-
-    }
-
-    private PropertyMetadata convertProperty(String property, Property prop) {
-        SimplePropertyMetadata metadata = new SimplePropertyMetadata();
-        metadata.setId(property);
-        metadata.setName(property);
-        ElasticPropertyType elasticPropertyType = ElasticPropertyType.of(prop._kind().jsonValue());
-        if (null != elasticPropertyType) {
-            DataType dataType = elasticPropertyType.getType();
-            if ((elasticPropertyType == ElasticPropertyType.OBJECT
-                || elasticPropertyType == ElasticPropertyType.NESTED)
-                && dataType instanceof ObjectType) {
-                ObjectType objectType = ((ObjectType) dataType);
-                objectType.setProperties(convertProperties(prop.nested().properties()));
-            }
-            metadata.setValueType(dataType);
-        } else {
-            metadata.setValueType(StringType.GLOBAL);
-        }
-        return metadata;
-    }
-
 
     protected List<Map<String, DynamicTemplate>> createDynamicTemplates() {
 

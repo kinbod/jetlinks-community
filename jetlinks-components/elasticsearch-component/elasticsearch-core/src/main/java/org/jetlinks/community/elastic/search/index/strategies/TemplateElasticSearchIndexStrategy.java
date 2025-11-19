@@ -15,8 +15,8 @@
  */
 package org.jetlinks.community.elastic.search.index.strategies;
 
+import co.elastic.clients.elasticsearch._types.mapping.TypeMapping;
 import co.elastic.clients.elasticsearch.indices.PutIndexTemplateRequest;
-import co.elastic.clients.elasticsearch.indices.TemplateMapping;
 import lombok.extern.slf4j.Slf4j;
 import org.jetlinks.community.elastic.search.ElasticSearchSupport;
 import org.jetlinks.community.elastic.search.index.ElasticSearchIndexMetadata;
@@ -89,7 +89,7 @@ public abstract class TemplateElasticSearchIndexStrategy extends AbstractElastic
 
         builder.template(template -> {
             template.aliases(getAlias(index), a -> a);
-            template.settings(properties::toSettings);
+            template.settings(settings -> properties.toSettings(metadata.getIndex(), settings));
             template.mappings(mapping -> {
                 mapping.dynamicTemplates(createDynamicTemplates());
                 mapping.properties(createElasticProperties(metadata.getProperties()));
@@ -106,14 +106,17 @@ public abstract class TemplateElasticSearchIndexStrategy extends AbstractElastic
     public Mono<ElasticSearchIndexMetadata> loadIndexMetadata(String index) {
         String name = getTemplate(index);
         return client.execute(t -> {
-            TemplateMapping mapping = ElasticSearchSupport
+            TypeMapping mapping = ElasticSearchSupport
                 .current()
-                .getTemplateMapping(
+                .getIndexTemplateMapping(
                     t.indices()
-                     .getTemplate(request -> request.name(getTemplate(index))),
+                     .getIndexTemplate(request -> request.name(name)),
                     name
                 );
-            return mapping == null ? null : convertMetadata(index, mapping.mappings());
+            if (mapping == null) {
+                log.warn("unknown elasticsearch index [{}] mapping", index);
+            }
+            return mapping == null ? null : convertMetadata(index, mapping);
         });
     }
 }

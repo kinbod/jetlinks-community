@@ -29,6 +29,7 @@ import org.hswebframework.ezorm.core.param.QueryParam;
 import org.hswebframework.ezorm.core.param.Sort;
 import org.hswebframework.ezorm.core.param.Term;
 import org.hswebframework.ezorm.core.param.TermType;
+import org.jetlinks.community.utils.ConverterUtils;
 import org.jetlinks.core.metadata.DataType;
 import org.jetlinks.core.metadata.PropertyMetadata;
 import org.jetlinks.core.metadata.types.ArrayType;
@@ -37,13 +38,11 @@ import org.jetlinks.community.elastic.search.enums.ElasticSearchTermType;
 import org.jetlinks.community.elastic.search.enums.ElasticSearchTermTypes;
 import org.jetlinks.community.elastic.search.index.ElasticSearchIndexMetadata;
 import org.jetlinks.community.things.utils.ThingsDatabaseUtils;
+import org.jetlinks.reactor.ql.utils.CastUtils;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -297,4 +296,44 @@ public class QueryParamTranslator {
             }));
         }
     }
+
+    public static List<Long> resolveQueryTimestampRange(String property, List<Term> terms) {
+
+        long from = 0;
+        long to = 0;
+        for (Term term : terms) {
+
+            if (Objects.equals(term.getColumn(), property)) {
+                if (Objects.equals(term.getTermType(), TermType.gt) ||
+                    Objects.equals(term.getTermType(), TermType.gte)) {
+                    from = CastUtils.castDate(term.getValue()).getTime();
+                } else if (Objects.equals(term.getTermType(), TermType.lt) ||
+                    Objects.equals(term.getTermType(), TermType.lte)) {
+                    to = CastUtils.castDate(term.getValue()).getTime();
+                } else if (Objects.equals(term.getTermType(), TermType.btw)) {
+                    List<Long> range = ConverterUtils.convertToList(
+                        term.getValue(),
+                        val -> CastUtils.castDate(val).getTime());
+                    if (range.size() >= 2) {
+                        return range;
+                    }
+                }
+            }
+            if (org.apache.commons.collections4.CollectionUtils.isNotEmpty(term.getTerms())) {
+                List<Long> range = resolveQueryTimestampRange(property, term.getTerms());
+                if (range != null && range.size() >= 2) {
+                    return range;
+                }
+            }
+        }
+
+        if (from == 0) {
+            return null;
+        }
+        if (to == 0) {
+            to = System.currentTimeMillis();
+        }
+        return Arrays.asList(from, to);
+    }
+
 }

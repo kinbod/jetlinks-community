@@ -15,9 +15,10 @@
  */
 package org.jetlinks.community.elastic.search.index;
 
-import org.jetlinks.core.metadata.PropertyMetadata;
 import org.jetlinks.community.elastic.search.utils.ElasticSearchConverter;
+import org.jetlinks.core.metadata.PropertyMetadata;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -28,6 +29,18 @@ public interface ElasticSearchIndexMetadata {
     List<PropertyMetadata> getProperties();
 
     PropertyMetadata getProperty(String property);
+
+    default Map<String,Object> getSettings(){
+        return Collections.emptyMap();
+    }
+
+    /**
+     * 获取时间戳对应的字段
+     */
+    default PropertyMetadata getTimestampProperty() {
+        return getProperty("timestamp");
+    }
+
 
     default Map<String, Object> convertToElastic(Map<String, Object> map) {
         return ElasticSearchConverter.convertDataToElastic(map, getProperties());
